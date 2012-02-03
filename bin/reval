@@ -1,0 +1,108 @@
+#!/usr/bin/env ruby
+require 'rubygems'
+require 'uri'
+require 'net/http'
+require 'trollop'
+
+def escape! h
+  h.keys.each do |k|
+    h[k] = h[k].to_s
+  end
+  h
+end
+
+FILETYPES = {
+  ".c" => "c",
+  ".h" => "c",
+  ".cpp"=> "cpp",
+  ".d" => "d",
+  ".hs" => "haskell",
+  ".lua" => "lua",
+  ".ml" => "ocaml",
+  ".mli" => "ocaml",
+  ".php" => "php",
+  ".pl" => "perl",
+  ".py" => "python",
+  ".rb" => "ruby",
+  ".scm" => "scheme",
+  ".ss" => "scheme",
+  ".tcl" => "tcl"
+}
+
+LANGS = {
+  'c'=>'C',
+  'cpp'=>'C++',
+  'd'=>'D',
+  'haskell'=>'Haskell',
+  'lua'=>'Lua',
+  'ocaml'=>'OCaml',
+  'php'=>'PHP',
+  'perl'=>'Perl',
+  'python'=>'Python',
+  'ruby'=>'Ruby',
+  'scheme'=>'Scheme',
+  'tcl'=>'Tcl'
+}
+
+def get(lang, code, priv=false)
+  url = 'http://codepad.org/'
+  data = {
+    'code' => code,
+    'lang' => LANGS[lang],
+    'submit' => 'Submit',
+    'run' => "True",
+    'private' => priv.to_s.capitalize
+  }
+
+  res = Net::HTTP.post_form(URI.parse(url), escape!(data))
+  res.fetch("location")
+end
+
+opts = Trollop::options do
+  opt :lang, "Programming language (will try to guess from filename)", :type => :string
+  opt :list, "List available languages"
+  opt :eval, "Pass in code to be eval'd on the command line", :type => :string
+  opt :file, "The file containing code to be evaluated", :type => :string
+  opt :private, "Make this code private.", :default => false, :type => :bool
+  opt :verbose, "Log actions", :default => false
+end
+
+if opts[:list]
+  puts "AVAILABLE LANGUAGES:\n#{LANGS.keys.inspect}"
+  exit
+end
+
+
+file = opts[:file] || ARGV[0]
+
+if file
+  begin
+    code = File.open(file).read
+  rescue Errno::ENOENT
+    puts "FILE DOES NOT EXIST."
+    exit
+  end
+else
+  code = opts[:eval]
+end
+
+if code == nil || code == ""
+  puts "PLEASE GIVE ME SOMETHING TO EVALUATE."
+  exit
+end
+
+
+lang = opts[:lang] || (file && FILETYPES[File.extname(file)])
+
+unless LANGS.keys.include?(lang)
+  puts "PLEASE SPECIFY A VALID LANGUAGE. CHOICES ARE: #{LANGS.keys.inspect}"
+  exit
+end
+
+if opts[:verbose]
+  puts "LANG: #{lang}"
+  puts "PRIVATE? #{opts[:private] ? "YES" : "NO"}"
+  print "RESULT: "
+end
+
+puts get(lang, code, opts[:private])
